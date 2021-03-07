@@ -9,29 +9,46 @@ var compression = require("compression");
 
 const port = 3000;
 const app = express();
-
 // parse application/x-www-form-urlencoded
 app.use(bodyParser.urlencoded({ extended: false }));
-
 // parse application/json
 app.use(bodyParser.json());
-
 app.use(compression());
 
-app.get("/", (request, response) => {
-  fs.readdir("./data", function (error, filelist) {
-    var title = "Welcome";
-    var description = "Hello, Node.js";
-    var list = template.list(filelist);
-    var html = template.HTML(
-      title,
-      list,
-      `<h2>${title}</h2>${description}`,
-      `<a href="/create">create</a>`
-    );
-    response.writeHead(200);
-    response.end(html);
+/**
+ * next : 그다음 호출되어야 할 미들웨어.
+ * post에는 middleware 적용 안되도록.
+ */
+app.get("*", (request, response, next) => {
+  console.log("next", next);
+  fs.readdir("./data", (error, filelist) => {
+    request.list = filelist; //실제 api에서 get 방식만 request.list 가 존재.
+    //post 방식은  request.list => undefined
+    next();
   });
+});
+
+/* app.use((request, response, next) => {
+  // console.log(request, response, next);
+  console.log("next", next);
+  fs.readdir("./data", (error, filelist) => {
+    request.list = filelist;
+    next();
+  });
+}); */
+
+app.get("/", (request, response) => {
+  var title = "Welcome";
+  var description = "Hello, Node.js";
+  var list = template.list(request.list);
+  var html = template.HTML(
+    title,
+    list,
+    `<h2>${title}</h2>${description}`,
+    `<a href="/create">create</a>`
+  );
+  response.writeHead(200);
+  response.end(html);
 });
 
 /* app.get("/page/:pageId/:chapterId", (request, response) => {
@@ -39,40 +56,38 @@ app.get("/", (request, response) => {
 }); */
 
 app.get("/page/:pageId", (request, response) => {
-  fs.readdir("./data", function (error, filelist) {
-    var filteredId = path.parse(request.params.pageId).base;
-    console.log(filteredId);
-    fs.readFile(`data/${filteredId}`, "utf8", function (err, description) {
-      var title = request.params.pageId;
-      var sanitizedTitle = sanitizeHtml(title);
-      var sanitizedDescription = sanitizeHtml(description, {
-        allowedTags: ["h1"],
-      });
-      var list = template.list(filelist);
-      var html = template.HTML(
-        sanitizedTitle,
-        list,
-        `<h2>${sanitizedTitle}</h2>${sanitizedDescription}`,
-        ` <a href="/create">create</a>
+  var filteredId = path.parse(request.params.pageId).base;
+  // console.log(filteredId);
+  fs.readFile(`data/${filteredId}`, "utf8", function (err, description) {
+    var title = request.params.pageId;
+    var sanitizedTitle = sanitizeHtml(title);
+    var sanitizedDescription = sanitizeHtml(description, {
+      allowedTags: ["h1"],
+    });
+    console.log("request.list", request.list);
+    var list = template.list(request.list);
+    var html = template.HTML(
+      sanitizedTitle,
+      list,
+      `<h2>${sanitizedTitle}</h2>${sanitizedDescription}`,
+      ` <a href="/create">create</a>
           <a href="/update/${sanitizedTitle}">update</a>
           <form action="/delete_process" method="post">
             <input type="hidden" name="id" value="${sanitizedTitle}">
             <input type="submit" value="delete">
           </form>`
-      );
-      response.send(html);
-    });
+    );
+    response.send(html);
   });
 });
 
 app.get("/create", (request, response) => {
-  fs.readdir("./data", function (error, filelist) {
-    var title = "WEB - create";
-    var list = template.list(filelist);
-    var html = template.HTML(
-      title,
-      list,
-      `
+  var title = "WEB - create";
+  var list = template.list(request.list);
+  var html = template.HTML(
+    title,
+    list,
+    `
       <form action="/create" method="post">
         <p><input type="text" name="title" placeholder="title"></p>
         <p>
@@ -83,10 +98,9 @@ app.get("/create", (request, response) => {
         </p>
       </form>
     `,
-      ""
-    );
-    response.send(html);
-  });
+    ""
+  );
+  response.send(html);
 });
 
 app.post("/create", (request, response) => {
@@ -116,15 +130,14 @@ app.post("/create", (request, response) => {
 });
 
 app.get("/update/:pageId", (request, response) => {
-  fs.readdir("./data", function (error, filelist) {
-    var filteredId = path.parse(request.params.pageId).base;
-    fs.readFile(`data/${filteredId}`, "utf8", function (err, description) {
-      var title = request.params.pageId;
-      var list = template.list(filelist);
-      var html = template.HTML(
-        title,
-        list,
-        `
+  var filteredId = path.parse(request.params.pageId).base;
+  fs.readFile(`data/${filteredId}`, "utf8", function (err, description) {
+    var title = request.params.pageId;
+    var list = template.list(request.list);
+    var html = template.HTML(
+      title,
+      list,
+      `
         <form action="/update_process" method="post">
           <input type="hidden" name="id" value="${title}">
           <p><input type="text" name="title" placeholder="title" value="${title}"></p>
@@ -136,10 +149,9 @@ app.get("/update/:pageId", (request, response) => {
           </p>
         </form>
         `,
-        `<a href="/create">create</a> <a href="/update/${title}">update</a>`
-      );
-      response.send(html);
-    });
+      `<a href="/create">create</a> <a href="/update/${title}">update</a>`
+    );
+    response.send(html);
   });
 });
 
