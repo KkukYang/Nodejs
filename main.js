@@ -5,6 +5,7 @@ var sanitizeHtml = require("sanitize-html");
 var path = require("path");
 var qs = require("querystring");
 var bodyParser = require("body-parser");
+var compression = require("compression");
 
 const port = 3000;
 const app = express();
@@ -14,6 +15,8 @@ app.use(bodyParser.urlencoded({ extended: false }));
 
 // parse application/json
 app.use(bodyParser.json());
+
+app.use(compression());
 
 app.get("/", (request, response) => {
   fs.readdir("./data", function (error, filelist) {
